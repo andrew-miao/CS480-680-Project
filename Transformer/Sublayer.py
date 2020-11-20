@@ -25,6 +25,7 @@ class MultiHeadAttention(nn.Module):
         self.fc_k = nn.Linear(d_model, d_model)
         self.fc_v = nn.Linear(d_model, d_model)
         self.fc_out = nn.Linear(d_model, d_model)
+        self.layernorm = nn.LayerNorm(d_model, 1e-6)
 
     def scaledAttention(self, query, key, value, mask=None):
         """
@@ -49,13 +50,45 @@ class MultiHeadAttention(nn.Module):
         :param batch_first: if batch_first is True, query size = (B, T, E), key size = (B, S, E), and value size = (B, S, E).
         :return: multi-head attention.
         """
+        residual = query
         query = self.fc_q(query)
         key = self.fc_k(key)
         value = self.fc_v(value)
         if not batch_first:
-            attn_score = self.scaledAttention(query.permute(1, 0, 2), key.permute(1, 0, 2), value.permute(1, 0, 2), mask)
-            attn_score = attn_score.permute(1, 0, 2)
+            output = self.scaledAttention(query.permute(1, 0, 2), key.permute(1, 0, 2), value.permute(1, 0, 2), mask)
+            output = output.permute(1, 0, 2)
         else:
-            attn_score = self.scaledAttention(query, key, value)
+            output = self.scaledAttention(query, key, value)
 
-        return self.fc_out(attn_score)
+        output = self.dropout(self.fc_out(output))
+        output.add_(residual)
+        return self.layernorm(output)
+
+class FeedForward(nn.Module):
+    """
+    Position-wise Feed-Forward Networks in original paper.
+    """
+    def __init__(self, d_model=512, d_ff=2048, dropout=0.1):
+        """
+        :param d_model: embedding dimension, default value = 512.
+        :param d_ff: the dimension of inner-layer, default value = 2048.
+        :param dropout: the probability of dropout.
+        """
+        super(FeedForward, self).__init__()
+
+        self.fc1 = nn.Linear(d_model, d_ff)
+        self.fc2 = nn.Linear(d_ff, d_model)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        self.layernorm = nn.LayerNorm(d_model, 1e-6)
+
+    def forward(self, x):
+        """
+        :param x: input of multi-head attention module.
+        :return: output of position-wise feed-forward networks module.
+        """
+        residual = x
+        x = self.fc2(self.relu(self.fc1(x)))
+        output = self.dropout(x)
+        output.add_(residual)
+        return self.layernorm(output)
