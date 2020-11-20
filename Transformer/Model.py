@@ -41,7 +41,7 @@ class Encoder(nn.Module):
                  max_seq=256, n_heads=1, d_model=512, d_ff=2048, dropout=0.1):
         """
         :param n_src_vocab: the number of vocabulary in the source text.
-        :param pad_idx: pads the output of embedding.
+        :param pad_idx: the idx of padding.
         :param n_layers: the number of encoder blocks.
         :param max_seq: the max sequence length that we will encode in PositionEncoding.
         :param n_heads: the number of heads
@@ -75,7 +75,7 @@ class Decoder(nn.Module):
                  max_seq=256, n_heads=1, d_model=512, d_ff=2048, dropout=0.1):
         """
         :param n_tgt_vocab: the number of vocabulary in the target text.
-        :param pad_idx: pads the output of embedding.
+        :param pad_idx: the idx of padding.
         :param n_layers: the number of encoder blocks.
         :param max_seq: the max sequence length that we will encode in PositionEncoding.
         :param n_heads: the number of heads
@@ -107,4 +107,61 @@ class Transformer(nn.Module):
     """
     Build a Transformer.
     """
-    # To do tomorrow.
+    def __init__(self, n_src_vocab, n_tgt_vocab, src_pad_idx, tgt_pad_idx, n_encoder_layers, n_decoder_layers,
+                 n_heads=1, d_model=512, d_ff=2048, max_seq=256, dropout=0.1):
+        """
+        :param n_src_vocab: the number of tokens in source text.
+        :param n_tgt_vocab: the number of tokens in target text
+        :param src_pad_idx: the idx of padding in source text.
+        :param tgt_pad_idx: the idx of padding in target text.
+        :param n_encoder_layers: the number of blocks in encoder.
+        :param n_decoder_layers: the number of blocks in decoder.
+        :param n_heads: the number of heads.
+        :param d_model: the embedding dimension.
+        :param d_ff: the hidden dimension of inner layers in Feed-Forward Networks.
+        :param max_seq: the max sequence length that we will encode in PositionEncoding.
+        :param dropout: the dropout probability.
+        """
+        super(Transformer, self).__init__()
+
+        self.encoder = Encoder(n_src_vocab, src_pad_idx, n_encoder_layers,
+                               max_seq=max_seq, n_heads=n_heads, d_model=d_model, d_ff=d_ff, dropout=dropout)
+
+        self.decoder = Decoder(n_tgt_vocab, tgt_pad_idx, n_decoder_layers,
+                               max_seq=max_seq, n_heads=n_heads, d_model=d_model, d_ff=d_ff, dropout=dropout)
+
+        self.fc = nn.Linear(d_model, n_tgt_vocab)
+        self.src_pad_idx = src_pad_idx
+        self.tgt_pad_idx = tgt_pad_idx
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+
+    def generate_general_mask(self, seq, pad_idx):
+        """
+        :param seq: the source/target sequence that we feed to the Transformer.
+        :param pad_idx: the idx of padding.
+        :return: the mask that can zero out the padding part in the sequence. The size of mask = (1, S, S), where S = max_seq.
+        """
+        return (seq & pad_idx).unsequeeze(0)
+
+    def generate_no_peek_mask(self, tgt_seq):
+        """
+        :param tgt_seq: the target sequence.
+        :return: no peek mask.
+        """
+        seq_len = tgt_seq.size(1)
+        mask = torch.triu(torch.ones(1, seq_len, seq_len)).bool()
+        return mask.permute(0, 2, 1)
+
+    def forward(self, src_seq, tgt_seq):
+        """
+        :param src_seq: the source sequence.
+        :param tgt_seq: the target sequence.
+        :return: the output (probability) of the Transformer.
+        """
+        src_mask = self.generate_general_mask(src_seq, self.src_pad_idx)
+        tgt_mask = self.generate_general_mask(tgt_seq, self.tgt_pad_idx) & self.generate_no_peek_mask(tgt_seq)
+        encoder_output = self.encoder(src_seq, src_mask)
+        decoder_output = self.decoder(tgt_seq, tgt_mask, encoder_output, src_mask)
+        return self.fc(decoder_output)
