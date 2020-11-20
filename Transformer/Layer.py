@@ -54,5 +54,5 @@ class DecoderLayer(nn.Module):
         :return: the output of one decoder block.
         """
         attn_output = self.masked_multi_head_attn(decoder_input, decoder_input, decoder_input, no_peek_mask)
-        attn_output = self.multi_head_attn(decoder_input, encoder_output, encoder_output, general_mask)
+        attn_output = self.multi_head_attn(attn_output, encoder_output, encoder_output, general_mask)
         return self.ffn(attn_output)
