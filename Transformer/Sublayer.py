@@ -9,7 +9,8 @@ class MultiHeadAttention(nn.Module):
     """
     Compute multi-head attention.
     """
-    def __init__(self, n_heads, d_model=512, dropout=0.1):
+    def __init__(self, n_heads=1, d_model=512, dropout=0.1):
+        # Because of the constrain of hardware (I only have one GPU: RTX 2060 Super), and thus, the default value of n_heads = 1.
         """
         :param n_heads: the number of heads.
         :param d_model: the embedding dimension.
