@@ -49,6 +49,8 @@ class Encoder(nn.Module):
         :param d_ff: the hidden dimension of inner layers in Feed-Forward Networks.
         :param dropout: the dropout probability.
         """
+        super(Encoder, self).__init__()
+
         self.embedding = nn.Embedding(n_src_vocab, d_model, padding_idx=pad_idx)
         self.position_encoder = PositionalEncoding(max_seq, d_model)
         self.encoder_blocks = nn.ModuleList([EncoderLayer(n_heads, d_model, d_ff, dropout) for _ in range(n_layers)])
@@ -83,6 +85,8 @@ class Decoder(nn.Module):
         :param d_ff: the hidden dimension of inner layers in Feed-Forward Networks.
         :param dropout: the dropout probability.
         """
+        super(Decoder, self).__init__()
+        
         self.embedding = nn.Embedding(n_tgt_vocab, d_model, padding_idx=pad_idx)
         self.position_encoder = PositionalEncoding(max_seq, d_model)
         self.decoder_blocks = nn.ModuleList([DecoderLayer(n_heads, d_model, d_ff, dropout) for _ in range(n_layers)])
@@ -137,7 +141,8 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def generate_general_mask(self, seq, pad_idx):
+    @staticmethod
+    def generate_general_mask(seq, pad_idx):
         """
         :param seq: the source/target sequence that we feed to the Transformer.
         :param pad_idx: the idx of padding.
@@ -145,7 +150,8 @@ class Transformer(nn.Module):
         """
         return (seq & pad_idx).unsequeeze(0)
 
-    def generate_no_peek_mask(self, tgt_seq):
+    @staticmethod
+    def generate_no_peek_mask(tgt_seq):
         """
         :param tgt_seq: the target sequence.
         :return: no peek mask.
