@@ -2,8 +2,8 @@
 Author: Yanting Miao
 """
 import torch.nn as nn
-from .Sublayer import MultiHeadAttention
-from .Sublayer import FeedForward
+from Sublayer import MultiHeadAttention
+from Sublayer import FeedForward
 
 class EncoderLayer(nn.Module):
     """
@@ -16,6 +16,7 @@ class EncoderLayer(nn.Module):
         :param d_ff: the hidden dimension of inner-layers.
         :param dropout: the dropout probability.
         """
+        super(EncoderLayer, self).__init__()
         self.multi_head_attn = MultiHeadAttention(n_heads, d_model, dropout)
         self.ffn = FeedForward(d_model, d_ff, dropout)
 
@@ -40,6 +41,7 @@ class DecoderLayer(nn.Module):
         :param d_ff: the hidden dimension of inner-layers.
         :param dropout: the dropout probability.
         """
+        super(DecoderLayer, self).__init__()
         self.masked_multi_head_attn = MultiHeadAttention(n_heads, d_model, dropout)
         self.multi_head_attn = MultiHeadAttention(n_heads, d_model, dropout)
         self.ffn = FeedForward(d_model, d_ff, dropout)

@@ -4,8 +4,8 @@ Author: Yanting Miao
 import torch
 import torch.nn as nn
 import math
-from .Layer import EncoderLayer
-from .Layer import DecoderLayer
+from Layer import EncoderLayer
+from Layer import DecoderLayer
 
 class PositionalEncoding(nn.Module):
     """
@@ -20,9 +20,9 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_seq, d_model)
         position = torch.arange(0, max_seq, dtype=torch.float).unsqueeze(dim=1)
-        dim_div = torch.exp((torch.arange(0, d_model, step=2, dtype=torch.float) / d_model) * (-math.log(10000)))
-        pe[:, 0:2] = torch.sin(torch.matmul(position, dim_div))
-        pe[:, 1:2] = torch.cos(torch.matmul(position, dim_div))
+        dim_div = torch.exp((torch.arange(0, d_model, step=2, dtype=torch.float) / d_model) * (-math.log(10000))).unsqueeze(dim=1)
+        pe[:, 0:2] = torch.sin(position * dim_div)
+        pe[:, 1:2] = torch.cos(position * dim_div)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
