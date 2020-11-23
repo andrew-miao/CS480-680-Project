@@ -1,78 +1,91 @@
 """
 Author: Yanting Miao
-This code refer to Process.py of SamLynn Evans (https://github.com/SamLynnEvans)
 """
-import re
-import spacy
-import os
-import pandas as pd
-from torchtext.data import Field, TabularDataset, Iterator
+import torch
 from Tokenize import Token
+from torchnlp.datasets import wmt_dataset
+from torch.utils.data import TensorDataset, DataLoader
 
-def read_data(src_path, tgt_path, test=False):
-    """
-    :param src_path: the path of source language text.
-    :param tgt_path: the path of target language text.
-    :param test: whether to produce dataloader for test dataset. Default = False.
-    :return: raw source language text, raw target language text.
-    """
-    raw_src_data = open(src_path).read().strip().split('\n')
-    raw_tgt_data = open(tgt_path).read().strip().split('\n')
-    if test:
-        separate_doc_words = ['srclang', 'origlang']
-        mask_words = ['<p>', '</p>', '</doc>', '</srcset>']
-        src_data, tgt_data = [], []
-        for sentence in raw_src_data:
-            if separate_doc_words not in sentence and sentence not in mask_words:
-                src_data.append(sentence[12:-6])
+def stats_sentence(sentence, vocab2num, count, max_seq):
+    for i in range(len(sentence)):
+        if sentence[i] not in vocab2num:
+            vocab2num[sentence[i]] = count
+            count += 1
+    max_seq = max(len(sentence), max_seq)
+    return vocab2num, count, max_seq
 
-        for sentence in raw_tgt_data:
-            if separate_doc_words not in sentence and sentence not in mask_words:
-                tgt_data.append(sentence[12:-6])
-
-    else:
-        src_data = [sentence for sentence in raw_src_data]
-        tgt_data = [sentence for sentence in raw_tgt_data]
-
-    return src_data, tgt_data
-
-
-def create_fields(src_lang, tgt_lang, batch_first=True):
-    """
-    :param src_lang: the abbreviation of source language, for example, English = 'en'.
-    :param tgt_lang: the abbreviation of target language, for example, France = 'fr'.
-    :param batch_first: whether to produce tensors with the batch dimension first. Default = True.
-    :return: the Fields of source language and target language.
-    """
+def stats_data(data, src_lang, trg_lang, train=True):
+    raw_src_data, raw_trg_data = [None] * len(data), [None] * len(data)
     src_tokenize = Token(src_lang)
-    tgt_tokenize = Token(tgt_lang)
-    src_field = Field(init_token='<bos>', eos_token='<eos>', lower=True,
-                      tokenize=src_tokenize.tokenizer, batch_first=batch_first)
-    tgt_field = Field(init_token='<bos>', eos_token='<eos>', lower=True,
-                      tokenize=tgt_tokenize.tokenizer, batch_first=batch_first)
-    return src_field, tgt_field
+    trg_tokenize = Token(trg_lang)
+    src_vocab2num = {'<pad>': 0, '<unk>': 1}
+    trg_vocab2num = {'<pad>': 0, '<unk>': 1}
+    src_count, trg_count = 2, 2
+    max_src_seq, max_trg_seq = 0, 0
+    for i in range(len(data)):
+        raw_src_data[i] = src_tokenize.tokenizer(data[i][src_lang])
+        raw_trg_data[i] = trg_tokenize.tokenizer(data[i][trg_lang])
+        if train:
+            src_vocab2num, src_count, max_src_seq = stats_sentence(raw_src_data[i], src_vocab2num, src_count, max_src_seq)
+            trg_vocab2num, trg_count, max_trg_seq = stats_sentence(raw_trg_data[i], trg_vocab2num, trg_count, max_trg_seq)
 
-def create_dataloader(src_path, src_lang, tgt_path, tgt_lang, batch_first=True, train=True, test=False, batch_size=4000):
-    """
-    :param src_path: the path of source language text.
-    :param src_lang: the abbreviation of source language, for example, English = 'en'.
-    :param tgt_path: the path of target language text.
-    :param tgt_lang: the abbreviation of target language, for example, France = 'fr'.
-    :param batch_first: whether to produce tensors with the batch dimension first. Default = True.
-    :param train: whether to produce dataloader for train dataset. Default = True.
-    :param test: whether to produce dataloader for test dataset. Default = False.
-    :param batch_size: the size of a single batch.
-    :return: padding idx of source and target, and a dataloader.
-    """
-    src_data, tgt_data = read_data(src_path, tgt_path, test)
-    raw_data = {'src': src_data, 'tgt': tgt_data}
-    df = pd.DataFrame(raw_data, columns=["src", "tgt"])
-    df.to_csv("tmp.csv", index=False)
-    src_field, tgt_field = create_fields(src_lang, tgt_lang, batch_first)
-    data_fields = [('src', src_field), ('tgt', tgt_field)]
-    dataset = TabularDataset('./tmp.csv', format='CSV', fields=data_fields)
-    dataloader = Iterator(dataset, batch_size=batch_size, train=train, shuffle=True)
-    os.remove('tmp.csv')
-    src_pad = src_field.vocab.stoi['<pad>']
-    tgt_pad = tgt_field.vocab.stoi['<pad>']
-    return src_pad, tgt_pad, dataloader
+    if not train:
+        return {'src': raw_src_data, 'trg': raw_trg_data}
+
+    return {'src': raw_src_data, 'trg': raw_trg_data}, src_vocab2num, trg_vocab2num, max(max_src_seq, max_trg_seq)
+
+def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq, test=False):
+    src_data = torch.zeros(len(data), max_seq)
+    trg_data = torch.zeros(len(data), max_seq)
+    trg_label = torch.zeros(len(data), max_seq, len(trg_vocab2num))
+    for i in range(len(data)):
+        for j in range(len(data['src'][i])):
+            word = data['src'][i][j]
+            if word in src_vocab2num:
+                src_data[i][j] = src_vocab2num[word]
+            else:
+                src_data[i][j] = src_vocab2num['<unk>']
+
+        for j in range(len(data['trg'][i])):
+            word = data['trg'][i][j]
+            if word in trg_vocab2num:
+                trg_data[i][j] = trg_vocab2num[word]
+                if not test:
+                    trg_label[i][j][trg_vocab2num[word]] = 1
+            else:
+                trg_data[i][j] = trg_vocab2num['<unk>']
+                if not test:
+                    trg_label[i][j][trg_vocab2num['<unk>']] = 1
+
+    if test:
+        return src_data, trg_data
+
+    return src_data, trg_data, trg_label
+
+
+if __name__ == '__main__':
+    train_data, dev_data, test_data = wmt_dataset(train=True, dev=True, test=True, train_filename='newstest2009', dev_filename='newstest2013', test_filename='newstest2014')
+    for i in range(10, 17):
+        if i != 13 and i != 14:
+            tmp_dir = 'newstest20' + str(i)
+            train_tmp = wmt_dataset(train=True, train_filename=tmp_dir)
+            train_data.extend(train_tmp)
+
+    print('Start preprocessing')
+    train_data, src_vocab2num, trg_vocab2num, max_seq = stats_data(train_data, 'en', 'de')
+    dev_data = stats_data(dev_data, 'en', 'de', False)
+    test_data = stats_data(test_data, 'en', 'de', False)
+    print('Building dataset')
+    train_src_data, train_trg_data, train_trg_label = build_train_dev_dataset(train_data, src_vocab2num, trg_vocab2num, max_seq)
+    dev_src_data, dev_trg_data, dev_trg_label = build_train_dev_dataset(dev_data, src_vocab2num, trg_vocab2num, max_seq)
+    test_src_data, test_trg_data = build_train_dev_dataset(test_data, src_vocab2num, trg_vocab2num, max_seq, test=True)
+    print('Saving results')
+    torch.save(train_src_data, 'train_src.pt')
+    torch.save(train_trg_data, 'train_trg.pt')
+    torch.save(train_trg_label, 'train_trg_label.pt')
+    torch.save(dev_src_data, 'dev_src.pt')
+    torch.save(dev_trg_data, 'dev_trg.pt')
+    torch.save(dev_trg_label, 'dev_trg_label.pt')
+    torch.save(test_src_data, 'test_src.pt')
+    torch.save(test_trg_data, 'test_trg.pt')
+    print('Done preprocessing')
