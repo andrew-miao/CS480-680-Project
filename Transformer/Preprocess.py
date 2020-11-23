@@ -3,8 +3,30 @@ Author: Yanting Miao
 """
 import torch
 from Tokenize import Token
+import numpy as np
 from torchnlp.datasets import wmt_dataset
-from torch.utils.data import TensorDataset, DataLoader
+
+def readLangs(lang1, lang2, train_size=0.8, dev_size=0.1):
+    print("Reading lines...")
+
+    # Read the file and split into lines
+    lines = open('data/%s-%s.txt' % (lang1, lang2), encoding='utf-8').read().strip().split('\n')
+    raw_data = []
+    for l in lines:
+        l = l.split('\t')
+        raw_data.append({'en': l[0], 'fr': l[1]})
+
+    raw_data = np.asarray(raw_data)
+    permute_idx = np.random.permutation(len(raw_data))
+    train_size = int(len(raw_data) * train_size)
+    dev_size = int(len(raw_data) * dev_size)
+    train_idx = permute_idx[:train_size]
+    dev_idx = permute_idx[train_size:dev_size + train_size]
+    test_idx = permute_idx[dev_size + train_size:]
+    train_data = raw_data[train_idx]
+    dev_data = raw_data[dev_idx]
+    test_data = raw_data[test_idx]
+    return train_data, dev_data, test_data
 
 def stats_sentence(sentence, vocab2num, count, max_seq):
     for i in range(len(sentence)):
@@ -34,11 +56,10 @@ def stats_data(data, src_lang, trg_lang, train=True):
 
     return {'src': raw_src_data, 'trg': raw_trg_data}, src_vocab2num, trg_vocab2num, max(max_src_seq, max_trg_seq)
 
-def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq, test=False):
-    src_data = torch.zeros(len(data), max_seq)
-    trg_data = torch.zeros(len(data), max_seq)
-    trg_label = torch.zeros(len(data), max_seq, len(trg_vocab2num))
-    for i in range(len(data)):
+def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq):
+    src_data = torch.zeros(len(data['src']), max_seq)
+    trg_data = torch.zeros(len(data['trg']), max_seq)
+    for i in range(len(data['src'])):
         for j in range(len(data['src'][i])):
             word = data['src'][i][j]
             if word in src_vocab2num:
@@ -46,46 +67,50 @@ def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq, test=Fa
             else:
                 src_data[i][j] = src_vocab2num['<unk>']
 
+    for i in range(len(data['trg'])):
         for j in range(len(data['trg'][i])):
             word = data['trg'][i][j]
             if word in trg_vocab2num:
                 trg_data[i][j] = trg_vocab2num[word]
-                if not test:
-                    trg_label[i][j][trg_vocab2num[word]] = 1
+
             else:
                 trg_data[i][j] = trg_vocab2num['<unk>']
-                if not test:
-                    trg_label[i][j][trg_vocab2num['<unk>']] = 1
 
-    if test:
-        return src_data, trg_data
 
-    return src_data, trg_data, trg_label
+    return src_data, trg_data
 
 
 if __name__ == '__main__':
-    train_data, dev_data, test_data = wmt_dataset(train=True, dev=True, test=True, train_filename='newstest2009', dev_filename='newstest2013', test_filename='newstest2014')
-    for i in range(10, 17):
-        if i != 13 and i != 14:
-            tmp_dir = 'newstest20' + str(i)
-            train_tmp = wmt_dataset(train=True, train_filename=tmp_dir)
-            train_data.extend(train_tmp)
+    wmt = False
+    if wmt:
+        src_lang = 'en'
+        trg_lang = 'de'
+
+        train_data, dev_data, test_data = wmt_dataset(train=True, dev=True, test=True, train_filename='newstest2009', dev_filename='newstest2013', test_filename='newstest2014')
+        for i in range(10, 11):
+            if i != 13 and i != 14:
+                tmp_dir = 'newstest20' + str(i)
+                train_tmp = wmt_dataset(train=True, train_filename=tmp_dir)
+                train_data.extend(train_tmp)
+    else:
+        src_lang = 'en'
+        trg_lang = 'fr'
+        train_data, dev_data, test_data = readLangs('eng', 'fra')
 
     print('Start preprocessing')
-    train_data, src_vocab2num, trg_vocab2num, max_seq = stats_data(train_data, 'en', 'de')
-    dev_data = stats_data(dev_data, 'en', 'de', False)
-    test_data = stats_data(test_data, 'en', 'de', False)
+    train_data, src_vocab2num, trg_vocab2num, max_seq = stats_data(train_data, src_lang, trg_lang)
+    dev_data = stats_data(dev_data, src_lang, trg_lang, False)
+    test_data = stats_data(test_data, src_lang, trg_lang, False)
     print('Building dataset')
-    train_src_data, train_trg_data, train_trg_label = build_train_dev_dataset(train_data, src_vocab2num, trg_vocab2num, max_seq)
-    dev_src_data, dev_trg_data, dev_trg_label = build_train_dev_dataset(dev_data, src_vocab2num, trg_vocab2num, max_seq)
-    test_src_data, test_trg_data = build_train_dev_dataset(test_data, src_vocab2num, trg_vocab2num, max_seq, test=True)
+    train_src_data, train_trg_data = build_train_dev_dataset(train_data, src_vocab2num, trg_vocab2num, max_seq)
+    dev_src_data, dev_trg_data = build_train_dev_dataset(dev_data, src_vocab2num, trg_vocab2num, max_seq)
+    test_src_data, test_trg_data = build_train_dev_dataset(test_data, src_vocab2num, trg_vocab2num, max_seq)
     print('Saving results')
     torch.save(train_src_data, 'train_src.pt')
     torch.save(train_trg_data, 'train_trg.pt')
-    torch.save(train_trg_label, 'train_trg_label.pt')
     torch.save(dev_src_data, 'dev_src.pt')
     torch.save(dev_trg_data, 'dev_trg.pt')
-    torch.save(dev_trg_label, 'dev_trg_label.pt')
     torch.save(test_src_data, 'test_src.pt')
     torch.save(test_trg_data, 'test_trg.pt')
+    torch.save(max_seq, 'max_seq.pt')
     print('Done preprocessing')
