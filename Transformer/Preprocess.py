@@ -6,6 +6,7 @@ from Tokenize import Token
 import numpy as np
 from torchnlp.datasets import wmt_dataset
 
+np.random.seed(42)
 def readLangs(lang1, lang2, train_size=0.8, dev_size=0.1):
     print("Reading lines...")
 
@@ -85,7 +86,6 @@ if __name__ == '__main__':
     if wmt:
         src_lang = 'en'
         trg_lang = 'de'
-
         train_data, dev_data, test_data = wmt_dataset(train=True, dev=True, test=True, train_filename='newstest2009', dev_filename='newstest2013', test_filename='newstest2014')
         for i in range(10, 11):
             if i != 13 and i != 14:
@@ -113,4 +113,6 @@ if __name__ == '__main__':
     torch.save(test_src_data, 'test_src.pt')
     torch.save(test_trg_data, 'test_trg.pt')
     torch.save(max_seq, 'max_seq.pt')
+    torch.save(src_vocab2num, 'src_token2num_pt')
+    torch.save(trg_vocab2num, 'trg_token2num_pt')
     print('Done preprocessing')
