@@ -20,10 +20,11 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_seq, d_model)
         position = torch.arange(0, max_seq, dtype=torch.float).unsqueeze(dim=1)
-        dim_div = torch.exp((torch.arange(0, d_model, step=2, dtype=torch.float) / d_model) * (-math.log(10000))).unsqueeze(dim=1)
-        pe[:, 0:2] = torch.sin(position * dim_div)
-        pe[:, 1:2] = torch.cos(position * dim_div)
-        self.register_buffer('pe', pe)
+        dim_div = torch.exp((torch.arange(0, d_model, step=2, dtype=torch.float) / d_model) * (-math.log(10000)))
+        a = position * dim_div
+        pe[:, 0::2] = torch.sin(position * dim_div)
+        pe[:, 1::2] = torch.cos(position * dim_div)
+        self.register_buffer('pe', pe.unsqueeze(0))
 
     def forward(self, x):
         """
@@ -143,6 +144,7 @@ class Transformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
         self.device = device
+        self.softmax = nn.LogSoftmax(dim=-1)
 
     @staticmethod
     def generate_general_mask(seq, pad_idx):
@@ -174,4 +176,5 @@ class Transformer(nn.Module):
         tgt_mask = self.generate_general_mask(tgt_seq, self.tgt_pad_idx) & self.generate_no_peek_mask(tgt_seq)
         encoder_output = self.encoder(src_seq, src_mask)
         decoder_output = self.decoder(tgt_seq, tgt_mask, encoder_output, src_mask)
-        return self.fc(decoder_output)
+        decoder_output = self.fc(decoder_output)
+        return self.softmax(decoder_output)

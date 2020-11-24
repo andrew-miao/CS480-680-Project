@@ -42,7 +42,7 @@ class MultiHeadAttention(nn.Module):
         score = self.dropout(score)
         return torch.bmm(score, value)
 
-    def forward(self, query, key, value, mask=None, batch_first=False):
+    def forward(self, query, key, value, mask=None, batch_first=True):
         """
         :param query: the size of query is (T, B, E), T is the target sequence length, B is the batch size, E is the embedding dimension.
         :param key: the size of key is (S, B, E), S is the source sequence length, B is the batch size, E is the embedding dimension.
