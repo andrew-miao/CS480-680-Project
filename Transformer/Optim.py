@@ -3,7 +3,7 @@ Author: Yanting Miao
 """
 
 class TransformerOptim():
-    def __init__(self, optimizer, d_model, warmup_steps=4000):
+    def __init__(self, optimizer, d_model=512, warmup_steps=4000):
         """
         :param optimizer: the optimizer that we used, in the original paper, Vaswani et al. use Adam.
         :param d_model: the embedding dimension.

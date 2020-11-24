@@ -3,6 +3,8 @@ Author: Yanting Miao
 """
 import time
 import torch
+import torch.nn as nn
+import torch.optim as optim
 from Model import Transformer
 from Optim import TransformerOptim
 
@@ -57,4 +59,24 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
                 model.train()
 
 if __name__ == '__main__':
+    n_epochs = 10
     train_data = torch.load('train_loader.pt')
+    dev_data = torch.load('dev_loader.pt')
+    test_data = torch.load('test_loader.pt')
+    src_token2num = torch.load('src_token2num.pt')
+    trg_token2num = torch.load('trg_token2num.pt')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Transformer(len(src_token2num), len(trg_token2num), 0, 0, 6, 6, device).to(device)
+    path = 'best_transformer.pt'
+    criterion = nn.CrossEntropyLoss()
+    adam_optim = optim.Adam(model.parameters(), betas=(0.9, 0.98), eps=1e-9)
+    optimizer = TransformerOptim(adam_optim)
+    print('Start training')
+    start = time.time()
+    training(model, train_data, dev_data, n_epochs, criterion, optimizer, device, path)
+    m, s = calculate_time(start)
+    print('Training took %dm%ds' % (m, s))
+    print('Start testing')
+    model = torch.load(path)
+    model = model.to(device)
+    evaluating(model, test_data, criterion, device)

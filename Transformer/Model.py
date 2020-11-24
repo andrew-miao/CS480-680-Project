@@ -111,7 +111,7 @@ class Transformer(nn.Module):
     """
     Build a Transformer.
     """
-    def __init__(self, n_src_vocab, n_tgt_vocab, src_pad_idx, tgt_pad_idx, n_encoder_layers, n_decoder_layers,
+    def __init__(self, n_src_vocab, n_tgt_vocab, src_pad_idx, tgt_pad_idx, n_encoder_layers, n_decoder_layers, device,
                  n_heads=1, d_model=512, d_ff=2048, max_seq=256, dropout=0.1):
         """
         :param n_src_vocab: the number of tokens in source text.
@@ -120,6 +120,7 @@ class Transformer(nn.Module):
         :param tgt_pad_idx: the idx of padding in target text.
         :param n_encoder_layers: the number of blocks in encoder.
         :param n_decoder_layers: the number of blocks in decoder.
+        :param n_src_vocab: cuda or cpu.
         :param n_heads: the number of heads.
         :param d_model: the embedding dimension.
         :param d_ff: the hidden dimension of inner layers in Feed-Forward Networks.
@@ -141,6 +142,8 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
+        self.device = device
+
     @staticmethod
     def generate_general_mask(seq, pad_idx):
         """
@@ -149,17 +152,17 @@ class Transformer(nn.Module):
         :return: the mask that can zero out the padding part in the sequence. The size of mask = (1, S, S), where S = max_seq.
         """
 
-        return (seq != pad_idx).unsequeeze(-2)
+        return (seq != pad_idx).unsqueeze(-2)
 
-    @staticmethod
-    def generate_no_peek_mask(tgt_seq):
+
+    def generate_no_peek_mask(self, tgt_seq):
         """
         :param tgt_seq: the target sequence.
         :return: no peek mask.
         """
         seq_len = tgt_seq.size(1)
         mask = torch.triu(torch.ones(1, seq_len, seq_len)).bool()
-        return mask.permute(0, 2, 1)
+        return mask.permute(0, 2, 1).to(self.device)
 
     def forward(self, src_seq, tgt_seq):
         """
