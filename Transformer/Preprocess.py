@@ -118,6 +118,6 @@ if __name__ == '__main__':
     torch.save(dev_loader, 'dev_loader.pt')
     torch.save(test_loader, 'test_loader.pt')
     torch.save(max_seq, 'max_seq.pt')
-    torch.save(src_vocab2num, 'src_token2num_pt')
-    torch.save(trg_vocab2num, 'trg_token2num_pt')
+    torch.save(src_vocab2num, 'src_token2num.pt')
+    torch.save(trg_vocab2num, 'trg_token2num.pt')
     print('Done preprocessing')

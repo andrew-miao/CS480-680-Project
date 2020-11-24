@@ -1,6 +1,10 @@
+"""
+Author: Yanting Miao
+"""
+import time
 import torch
+from Model import Transformer
+from Optim import TransformerOptim
 
-train_src = torch.load('train_src.pt')
-print(train_src.size())
-max_seq = torch.load('max_seq.pt')
-print(max_seq)
+def timeSince(start):
+    end = time.time()

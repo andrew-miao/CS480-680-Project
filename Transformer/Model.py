@@ -148,7 +148,8 @@ class Transformer(nn.Module):
         :param pad_idx: the idx of padding.
         :return: the mask that can zero out the padding part in the sequence. The size of mask = (1, S, S), where S = max_seq.
         """
-        return (seq & pad_idx).unsequeeze(0)
+
+        return (seq != pad_idx).unsequeeze(-2)
 
     @staticmethod
     def generate_no_peek_mask(tgt_seq):
