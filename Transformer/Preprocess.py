@@ -5,6 +5,7 @@ import torch
 from Tokenize import Token
 import numpy as np
 from torchnlp.datasets import wmt_dataset
+from torch.utils.data import TensorDataset, DataLoader
 
 np.random.seed(42)
 def readLangs(lang1, lang2, train_size=0.8, dev_size=0.1):
@@ -105,13 +106,17 @@ if __name__ == '__main__':
     train_src_data, train_trg_data = build_train_dev_dataset(train_data, src_vocab2num, trg_vocab2num, max_seq)
     dev_src_data, dev_trg_data = build_train_dev_dataset(dev_data, src_vocab2num, trg_vocab2num, max_seq)
     test_src_data, test_trg_data = build_train_dev_dataset(test_data, src_vocab2num, trg_vocab2num, max_seq)
+    train_data = TensorDataset(train_src_data, train_trg_data)
+    dev_data = TensorDataset(dev_src_data, dev_trg_data)
+    test_data = TensorDataset(test_src_data, test_trg_data)
+    print('Building dataloader')
+    train_loader = DataLoader(train_data, batch_size=400, pin_memory=True)
+    dev_loader = DataLoader(dev_data, batch_size=400, pin_memory=True)
+    test_loader = DataLoader(test_data, batch_size=400, pin_memory=True)
     print('Saving results')
-    torch.save(train_src_data, 'train_src.pt')
-    torch.save(train_trg_data, 'train_trg.pt')
-    torch.save(dev_src_data, 'dev_src.pt')
-    torch.save(dev_trg_data, 'dev_trg.pt')
-    torch.save(test_src_data, 'test_src.pt')
-    torch.save(test_trg_data, 'test_trg.pt')
+    torch.save(train_loader, 'train_loader.pt')
+    torch.save(dev_loader, 'dev_loader.pt')
+    torch.save(test_loader, 'test_loader.pt')
     torch.save(max_seq, 'max_seq.pt')
     torch.save(src_vocab2num, 'src_token2num_pt')
     torch.save(trg_vocab2num, 'trg_token2num_pt')
