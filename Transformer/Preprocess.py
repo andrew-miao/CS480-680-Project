@@ -83,7 +83,7 @@ def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq):
 
 
 if __name__ == '__main__':
-    batch_size = 400
+    batch_size = 200
     wmt = False
     if wmt:
         src_lang = 'en'
@@ -111,9 +111,9 @@ if __name__ == '__main__':
     dev_data = TensorDataset(dev_src_data.type(torch.long), dev_trg_data.type(torch.long))
     test_data = TensorDataset(test_src_data.type(torch.long), test_trg_data.type(torch.long))
     print('Building dataloader')
-    train_loader = DataLoader(train_data, batch_size=batch_size, pin_memory=True)
-    dev_loader = DataLoader(dev_data, batch_size=batch_size, pin_memory=True)
-    test_loader = DataLoader(test_data, batch_size=batch_size, pin_memory=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, pin_memory=True, drop_last=True)
+    dev_loader = DataLoader(dev_data, batch_size=batch_size, pin_memory=True, drop_last=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, pin_memory=True, drop_last=True)
     print('Saving results')
     torch.save(train_loader, 'train_loader.pt')
     torch.save(dev_loader, 'dev_loader.pt')
