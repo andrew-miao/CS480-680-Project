@@ -32,6 +32,8 @@ def evaluating(model, data, criterion, device):
     return total_loss / len(data)
 
 def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device, path):
+    train_loss_list = []
+    val_loss_list = []
     model.train()
     step = 1
     print_every = len(train_data)
@@ -50,6 +52,8 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
             if step % print_every == 0:
                 val_loss = evaluating(model, dev_data, criterion, device)
                 m, s = calculate_time(start)
+                train_loss_list.append(running_loss / len(train_data))
+                val_loss_list.append(val_loss)
                 print('%d/%d, (%dm%ds), train loss: %.3f, val loss: %.3f' %
                       (epoch + 1, n_epochs, m, s, running_loss / len(train_data), val_loss))
                 if min_loss is None or min_loss > val_loss:
@@ -61,9 +65,11 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
                     torch.save(model, path)
                 running_loss = 0.0
                 model.train()
+    return train_loss_list, val_loss_list
 
 if __name__ == '__main__':
     n_epochs = 10
+    optim_name = 'Adam'
     train_data = torch.load('train_loader.pt')
     dev_data = torch.load('dev_loader.pt')
     test_data = torch.load('test_loader.pt')
@@ -79,7 +85,7 @@ if __name__ == '__main__':
     optimizer = TransformerOptim(adam_optim)
     print('Start training')
     start = time.time()
-    training(model, train_data, dev_data, n_epochs, criterion, optimizer, device, path)
+    train_loss, val_loss = training(model, train_data, dev_data, n_epochs, criterion, optimizer, device, path)
     m, s = calculate_time(start)
     print('Training took %dm%ds' % (m, s))
     print('Start testing')
@@ -87,3 +93,10 @@ if __name__ == '__main__':
     model = model.to(device)
     test_loss = evaluating(model, test_data, criterion, device)
     print('Test loss: %.3f' % (test_loss))
+    print('Saving experiment result')
+    train_loss_path = optim_name + '_train_loss.pt'
+    val_loss_path = optim_name + '_val_loss.pt'
+    test_loss_path = optim_name + '_test_loss.pt'
+    torch.save(train_loss, train_loss_path)
+    torch.save(val_loss, val_loss_path)
+    torch.save(test_loss, test_loss_path)
