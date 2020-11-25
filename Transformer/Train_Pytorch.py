@@ -5,7 +5,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from Model import TransformerModel
+from Model_Pytorch import TransformerModel
 from Optim import TransformerOptim
 
 def embedding(x, n_vocab, device, d_model=512):
@@ -41,16 +41,12 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
         running_loss = 0.0
         for src, trg in train_data:
             src, trg = src.to(device), trg.to(device)
-            if step == 162:
-                print(src.size())
-                print(trg.size())
             output = model(src, trg)
             loss = criterion(output, trg)
             running_loss += loss.item()
             loss.backward()
             optimizer.step()
             step += 1
-            print('step %d' % (step))
             if step % print_every == 0:
                 val_loss = evaluating(model, dev_data, criterion, device)
                 m, s = calculate_time(start)
@@ -75,7 +71,7 @@ if __name__ == '__main__':
     trg_token2num = torch.load('trg_token2num.pt')
     max_seq = torch.load('max_seq.pt')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = TransformerModel(len(src_token2num), len(trg_token2num), n_encoders=1, n_decoders=1, d_ff=1024).to(device)
+    model = TransformerModel(len(src_token2num), len(trg_token2num), n_encoders=1, n_decoders=1, d_ff=1024, n_heads=1).to(device)
     # model = Transformer(num_encoder_layers=4, num_decoder_layers=4).to(device)
     path = 'best_transformer.pt'
     criterion = nn.CrossEntropyLoss()
