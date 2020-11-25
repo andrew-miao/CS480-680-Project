@@ -42,6 +42,7 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
     for epoch in range(n_epochs):
         running_loss = 0.0
         for src, trg in train_data:
+            optimizer.zero_grad()
             src, trg = src.to(device), trg.to(device)
             output = model(src, trg)
             loss = criterion(output, trg)
