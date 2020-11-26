@@ -25,8 +25,10 @@ def evaluating(model, data, criterion, device):
     with torch.no_grad():
         for src, trg in data:
             src, trg = src.to(device), trg.to(device)
-            output = model(src, trg)
-            loss = criterion(output, trg)
+            trg_input = trg[:, :-1]
+            trg_real = trg[:, 1:]
+            translate = model(src, trg_input)
+            loss = criterion(translate, trg_real)
             total_loss += loss.item()
 
     return total_loss / len(data)
@@ -43,9 +45,12 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
         running_loss = 0.0
         for src, trg in train_data:
             optimizer.zero_grad()
-            src, trg = src.to(device), trg.to(device)
-            output = model(src, trg)
-            loss = criterion(output, trg)
+            src = src.to(device)
+            # shifted to right, for example, trg = "<s>I love cats</s>", trg_input = "<s>I love cats", trg_real = "I love cats</s>"
+            trg_input = trg[:, :-1].to(device)
+            trg_real = trg[:, 1:].to(device)
+            translate = model(src, trg_input)
+            loss = criterion(translate, trg_real)
             running_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -71,17 +76,17 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
 if __name__ == '__main__':
     n_epochs = 10
     optim_name = 'Adam'
+    print('Loading dataset')
     train_data = torch.load('train_loader.pt')
     dev_data = torch.load('dev_loader.pt')
     test_data = torch.load('test_loader.pt')
-    src_token2num = torch.load('src_token2num.pt')
-    trg_token2num = torch.load('trg_token2num.pt')
-    max_seq = torch.load('max_seq.pt')
+    src_vocab2num = torch.load('src_vocab2num.pt')
+    trg_vocab2num = torch.load('trg_vocab2num.pt')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = TransformerModel(len(src_token2num), len(trg_token2num), n_encoders=1, n_decoders=1, d_ff=1024, n_heads=1).to(device)
-    # model = Transformer(num_encoder_layers=4, num_decoder_layers=4).to(device)
-    path = 'best_transformer.pt'
-    criterion = nn.CrossEntropyLoss()
+    # device = torch.device('cpu')
+    model = TransformerModel(len(src_vocab2num), len(trg_vocab2num), 512, 1, 1, 1, d_ff=1024).to(device)
+    path = 'best_adam_transformer.pt'
+    criterion = nn.CrossEntropyLoss(ignore_index=0)
     adam_optim = optim.Adam(model.parameters(), betas=(0.9, 0.98), eps=1e-9)
     optimizer = TransformerOptim(adam_optim)
     print('Start training')
@@ -92,12 +97,12 @@ if __name__ == '__main__':
     print('Start testing')
     model = torch.load(path)
     model = model.to(device)
-    test_loss = evaluating(model, test_data, criterion, device)
-    print('Test loss: %.3f' % (test_loss))
+    # test_loss = evaluating(model, test_data, criterion, device)
+    # print('Test loss: %.3f' % (test_loss))
     print('Saving experiment result')
     train_loss_path = optim_name + '_train_loss.pt'
     val_loss_path = optim_name + '_val_loss.pt'
     test_loss_path = optim_name + '_test_loss.pt'
     torch.save(train_loss, train_loss_path)
     torch.save(val_loss, val_loss_path)
-    torch.save(test_loss, test_loss_path)
+    # torch.save(test_loss, test_loss_path)

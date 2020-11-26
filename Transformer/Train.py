@@ -7,6 +7,17 @@ import torch.nn as nn
 import torch.optim as optim
 from Model import Transformer
 from Optim import TransformerOptim
+import spacy
+from torchtext.data import Field, BucketIterator
+from torchtext.datasets import IWSLT
+
+def tokenize_en(text):
+    spacy_token = spacy.load('en')
+    return [tok.text for tok in spacy_token.tokenizer(text)]
+
+def tokenize_de(text):
+    spacy_token = spacy.load('de')
+    return [tok.text for tok in spacy_token.tokenizer(text)]
 
 def calculate_time(start):
     end = time.time()
@@ -21,8 +32,10 @@ def evaluating(model, data, criterion, device):
     with torch.no_grad():
         for src, trg in data:
             src, trg = src.to(device), trg.to(device)
-            translate = model(src, trg).permute(0, 2, 1)
-            loss = criterion(translate, trg)
+            trg_input = trg[:, :-1]
+            trg_real = trg[:, 1:]
+            translate = model(src, trg_input).permute(0, 2, 1)
+            loss = criterion(translate, trg_real)
             total_loss += loss.item()
 
     return total_loss / len(data)
@@ -40,8 +53,11 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
         for src, trg in train_data:
             optimizer.zero_grad()
             src, trg = src.to(device), trg.to(device)
-            translate = model(src, trg).permute(0, 2, 1)
-            loss = criterion(translate, trg)
+            # shifted to right, for example, trg = "<s>I love cats</s>", trg_input = "<s>I love cats", trg_real = "I love cats</s>"
+            trg_input = trg[:, :-1]
+            trg_real = trg[:, 1:]
+            translate = model(src, trg_input).permute(0, 2, 1)
+            loss = criterion(translate, trg_real)
             running_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -66,17 +82,18 @@ def training(model, train_data, dev_data, n_epochs, criterion, optimizer, device
 
 if __name__ == '__main__':
     n_epochs = 10
+    max_seq = 60
     optim_name = 'Adam'
+    print('Loading IWSLT dataset')
     train_data = torch.load('train_loader.pt')
     dev_data = torch.load('dev_loader.pt')
     test_data = torch.load('test_loader.pt')
-    src_token2num = torch.load('src_token2num.pt')
-    trg_token2num = torch.load('trg_token2num.pt')
-    max_seq = torch.load('max_seq.pt')
+    src_vocab2num = torch.load('src_vocab2num.pt')
+    trg_vocab2num = torch.load('trg_vocab2num.pt')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = Transformer(len(src_token2num), len(trg_token2num), 0, 0, 1, 1, device, max_seq=max_seq, d_ff=1024).to(device)
-    path = 'best_transformer.pt'
-    criterion = nn.CrossEntropyLoss()
+    model = Transformer(len(src_vocab2num), len(trg_vocab2num), 0, 0, 1, 1, device, max_seq=max_seq, d_ff=1024).to(device)
+    path = 'best_adam_transformer.pt'
+    criterion = nn.CrossEntropyLoss(ignore_index=0)
     adam_optim = optim.Adam(model.parameters(), betas=(0.9, 0.98), eps=1e-9)
     optimizer = TransformerOptim(adam_optim)
     print('Start training')

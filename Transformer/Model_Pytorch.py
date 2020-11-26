@@ -2,11 +2,11 @@ import torch.nn as nn
 from torch.nn import Transformer
 
 class TransformerModel(nn.Module):
-    def __init__(self, n_src_vocab, n_trg_vocab, d_model=512, n_heads=8, n_encoders=6, n_decoders=6, d_ff=2048, dropout=0.1):
+    def __init__(self, n_src_vocab, n_trg_vocab, d_model=512, n_heads=8, n_encoders=6, n_decoders=6, d_ff=2048, dropout=0.1, padding_idx=1):
         super(TransformerModel, self).__init__()
 
-        self.src_embedding = nn.Embedding(n_src_vocab, d_model)
-        self.trg_embedding = nn.Embedding(n_trg_vocab, d_model)
+        self.src_embedding = nn.Embedding(n_src_vocab, d_model, padding_idx=padding_idx)
+        self.trg_embedding = nn.Embedding(n_trg_vocab, d_model, padding_idx=padding_idx)
         self.transformer = Transformer(d_model, n_heads, num_encoder_layers=n_encoders, num_decoder_layers=n_decoders,
                                        dim_feedforward=d_ff, dropout=dropout)
         self.fc = nn.Linear(d_model, n_trg_vocab)

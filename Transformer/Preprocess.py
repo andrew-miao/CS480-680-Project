@@ -1,11 +1,19 @@
-"""
-Author: Yanting Miao
-"""
+import spacy
+from torchtext.data import Field
+from torchtext.datasets import IWSLT
 import torch
+from torch.utils.data import TensorDataset, DataLoader
 from Tokenize import Token
 import numpy as np
-from torchnlp.datasets import wmt_dataset
-from torch.utils.data import TensorDataset, DataLoader
+
+spacy_de = spacy.load('de')
+spacy_en = spacy.load('en')
+
+def tokenize_de(text):
+    return [tok.text for tok in spacy_de.tokenizer(text)]
+
+def tokenize_en(text):
+    return [tok.text for tok in spacy_en.tokenizer(text)]
 
 np.random.seed(42)
 def readLangs(lang1, lang2, train_size=0.8, dev_size=0.1):
@@ -59,8 +67,8 @@ def stats_data(data, src_lang, trg_lang, train=True):
     return {'src': raw_src_data, 'trg': raw_trg_data}, src_vocab2num, trg_vocab2num, max(max_src_seq, max_trg_seq)
 
 def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq):
-    src_data = torch.zeros(len(data['src']), max_seq)
-    trg_data = torch.zeros(len(data['trg']), max_seq)
+    src_data = torch.ones(len(data['src']), max_seq)
+    trg_data = torch.ones(len(data['trg']), max_seq)
     for i in range(len(data['src'])):
         for j in range(len(data['src'][i])):
             word = data['src'][i][j]
@@ -82,24 +90,84 @@ def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq):
     return src_data, trg_data
 
 
-if __name__ == '__main__':
-    batch_size = 200
-    wmt = False
-    if wmt:
-        src_lang = 'en'
-        trg_lang = 'de'
-        train_data, dev_data, test_data = wmt_dataset(train=True, dev=True, test=True, train_filename='newstest2009', dev_filename='newstest2013', test_filename='newstest2014')
-        for i in range(10, 11):
-            if i != 13 and i != 14:
-                tmp_dir = 'newstest20' + str(i)
-                train_tmp = wmt_dataset(train=True, train_filename=tmp_dir)
-                train_data.extend(train_tmp)
-    else:
-        src_lang = 'en'
-        trg_lang = 'fr'
-        train_data, dev_data, test_data = readLangs('eng', 'fra')
+iwslt = False
+batch_size = 200
+print('Loading dataset')
+if iwslt:
+    BOS_WORD = '<s>'
+    EOS_WORD = '</s>'
+    BLANK_WORD = "<pad>"
+    SRC = Field(tokenize=tokenize_en, pad_token=BLANK_WORD)
+    TGT = Field(tokenize=tokenize_de, init_token=BOS_WORD, eos_token = EOS_WORD, pad_token=BLANK_WORD)
+    max_seq = 20
+    train, dev, test = IWSLT.splits(exts=('.en', '.de'), fields=(SRC, TGT), filter_pred=lambda x: len(vars(x)['src']) <= max_seq and len(vars(x)['trg']) <= max_seq)
 
-    print('Start preprocessing')
+    min_freq = 2
+    batch_size = 200
+    SRC.build_vocab(train.src, min_freq=min_freq)
+    TGT.build_vocab(train.trg, min_freq=min_freq)
+
+    src_vocab = SRC.vocab
+    trg_vocab = TGT.vocab
+    src_train_data = torch.ones(len(train), max_seq)
+    trg_train_data = torch.ones(len(train), max_seq)
+    src_dev_data = torch.ones(len(dev), max_seq)
+    trg_dev_data = torch.ones(len(dev), max_seq)
+    src_test_data = torch.ones(len(test), max_seq)
+    raw_test_trg = []
+
+    for i, sentence in enumerate(train):
+        for j, word in enumerate(sentence.src):
+            src_train_data[i][j] = src_vocab.stoi[word]
+
+        for j, word in enumerate(sentence.trg):
+            trg_train_data[i][j] = trg_vocab.stoi[word]
+
+    for i, sentence in enumerate(dev):
+        for j, word in enumerate(sentence.src):
+            if word in src_vocab.stoi:
+                src_dev_data[i][j] = src_vocab.stoi[word]
+            else:
+                src_dev_data[i][j] = 0
+
+        for j, word in enumerate(sentence.trg):
+            if word in trg_vocab.stoi:
+                trg_dev_data[i][j] = trg_vocab.stoi[word]
+            else:
+                trg_dev_data[i][j] = 0
+
+    for i, sentence in enumerate(test):
+        for j, word in enumerate(sentence.src):
+            if word in src_vocab.stoi:
+                src_test_data[i][j] = src_vocab.stoi[word]
+            else:
+                src_test_data[i][j] = 0
+
+        raw_test_trg.append(sentence.trg)
+
+    src_train_data, trg_train_data = src_train_data.type(torch.long), trg_train_data.type(torch.long)
+    src_dev_data, trg_dev_data = src_dev_data.type(torch.long), trg_dev_data.type(torch.long)
+    src_test_data = src_test_data.type(torch.long)
+
+    print('Building dataset')
+    train = TensorDataset(src_train_data, trg_train_data)
+    dev = TensorDataset(src_dev_data, trg_dev_data)
+    test = TensorDataset(src_test_data)
+
+    print('Building dataloader')
+    train_loader = DataLoader(train, batch_size=batch_size, pin_memory=True)
+    dev_loader = DataLoader(dev, batch_size=batch_size, pin_memory=True)
+    test_loader = DataLoader(test, batch_size=batch_size, pin_memory=True)
+    torch.save(src_vocab.stoi, 'src_vocab2num.pt')
+    torch.save(src_vocab.itos, 'src_num2vocab.pt')
+    torch.save(trg_vocab.stoi, 'trg_vocab2num.pt')
+    torch.save(trg_vocab.itos, 'trg_num2vocab.pt')
+    torch.save(raw_test_trg, 'raw_test_trg.pt')
+
+else:
+    src_lang = 'en'
+    trg_lang = 'fr'
+    train_data, dev_data, test_data = readLangs('eng', 'fra')
     train_data, src_vocab2num, trg_vocab2num, max_seq = stats_data(train_data, src_lang, trg_lang)
     dev_data = stats_data(dev_data, src_lang, trg_lang, False)
     test_data = stats_data(test_data, src_lang, trg_lang, False)
@@ -114,11 +182,11 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_data, batch_size=batch_size, pin_memory=True, drop_last=True)
     dev_loader = DataLoader(dev_data, batch_size=batch_size, pin_memory=True, drop_last=True)
     test_loader = DataLoader(test_data, batch_size=batch_size, pin_memory=True, drop_last=True)
-    print('Saving results')
-    torch.save(train_loader, 'train_loader.pt')
-    torch.save(dev_loader, 'dev_loader.pt')
-    torch.save(test_loader, 'test_loader.pt')
-    torch.save(max_seq, 'max_seq.pt')
-    torch.save(src_vocab2num, 'src_token2num.pt')
-    torch.save(trg_vocab2num, 'trg_token2num.pt')
-    print('Done preprocessing')
+    torch.save(src_vocab2num, 'src_vocab2num.pt')
+    torch.save(trg_vocab2num, 'trg_vocab2num.pt')
+
+print('Saving dataloader')
+
+torch.save(train_loader, 'train_loader.pt')
+torch.save(dev_loader, 'dev_loader.pt')
+torch.save(test_loader, 'test_loader.pt')
