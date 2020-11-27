@@ -70,7 +70,7 @@ def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq):
     src_data = torch.ones(len(data['src']), max_seq)
     trg_data = torch.ones(len(data['trg']), max_seq)
     for i in range(len(data['src'])):
-        for j in range(len(data['src'][i])):
+        for j in range(min(len(data['src'][i]), max_seq)):
             word = data['src'][i][j]
             if word in src_vocab2num:
                 src_data[i][j] = src_vocab2num[word]
@@ -78,7 +78,7 @@ def build_train_dev_dataset(data, src_vocab2num, trg_vocab2num, max_seq):
                 src_data[i][j] = src_vocab2num['<unk>']
 
     for i in range(len(data['trg'])):
-        for j in range(len(data['trg'][i])):
+        for j in range(min(len(data['trg'][i]), max_seq)):
             word = data['trg'][i][j]
             if word in trg_vocab2num:
                 trg_data[i][j] = trg_vocab2num[word]
@@ -179,9 +179,9 @@ else:
     dev_data = TensorDataset(dev_src_data.type(torch.long), dev_trg_data.type(torch.long))
     test_data = TensorDataset(test_src_data.type(torch.long), test_trg_data.type(torch.long))
     print('Building dataloader')
-    train_loader = DataLoader(train_data, batch_size=batch_size, pin_memory=True, drop_last=True)
-    dev_loader = DataLoader(dev_data, batch_size=batch_size, pin_memory=True, drop_last=True)
-    test_loader = DataLoader(test_data, batch_size=batch_size, pin_memory=True, drop_last=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, pin_memory=True)
+    dev_loader = DataLoader(dev_data, batch_size=batch_size, pin_memory=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, pin_memory=True)
     torch.save(src_vocab2num, 'src_vocab2num.pt')
     torch.save(trg_vocab2num, 'trg_vocab2num.pt')
 
