@@ -50,8 +50,8 @@ def stats_data(data, src_lang, trg_lang, train=True):
     raw_src_data, raw_trg_data = [None] * len(data), [None] * len(data)
     src_tokenize = Token(src_lang)
     trg_tokenize = Token(trg_lang)
-    src_vocab2num = {'<pad>': 0, '<unk>': 1}
-    trg_vocab2num = {'<pad>': 0, '<unk>': 1}
+    src_vocab2num = {'<unk>': 0, '<pad>': 1}
+    trg_vocab2num = {'<unk>': 0, '<pad>': 1}
     src_count, trg_count = 2, 2
     max_src_seq, max_trg_seq = 0, 0
     for i in range(len(data)):
