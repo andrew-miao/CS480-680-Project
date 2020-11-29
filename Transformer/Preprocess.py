@@ -50,9 +50,9 @@ def stats_data(data, src_lang, trg_lang, train=True):
     raw_src_data, raw_trg_data = [None] * len(data), [None] * len(data)
     src_tokenize = Token(src_lang)
     trg_tokenize = Token(trg_lang)
-    src_vocab2num = {'<unk>': 0, '<pad>': 1}
-    trg_vocab2num = {'<unk>': 0, '<pad>': 1}
-    src_count, trg_count = 2, 2
+    src_vocab2num = {'<unk>': 0, '<pad>': 1, '<s>': 2, '</s>': 3}
+    trg_vocab2num = {'<unk>': 0, '<pad>': 1, '<s>': 2, '</s>': 3}
+    src_count, trg_count = 4, 4
     max_src_seq, max_trg_seq = 0, 0
     for i in range(len(data)):
         raw_src_data[i] = src_tokenize.tokenizer(data[i][src_lang])
@@ -114,6 +114,7 @@ if iwslt:
     src_dev_data = torch.ones(len(dev), max_seq)
     trg_dev_data = torch.ones(len(dev), max_seq)
     src_test_data = torch.ones(len(test), max_seq)
+    raw_dev_trg = []
     raw_test_trg = []
 
     for i, sentence in enumerate(train):
@@ -135,6 +136,8 @@ if iwslt:
                 trg_dev_data[i][j] = trg_vocab.stoi[word]
             else:
                 trg_dev_data[i][j] = 0
+
+        raw_dev_trg.append((sentence.trg))
 
     for i, sentence in enumerate(test):
         for j, word in enumerate(sentence.src):
@@ -162,7 +165,8 @@ if iwslt:
     torch.save(src_vocab.itos, 'src_num2vocab.pt')
     torch.save(trg_vocab.stoi, 'trg_vocab2num.pt')
     torch.save(trg_vocab.itos, 'trg_num2vocab.pt')
-    torch.save(raw_test_trg, 'raw_test_trg.pt')
+    torch.save(raw_dev_trg, 'dev_raw_trg.pt')
+    torch.save(raw_test_trg, 'test_raw_trg.pt')
 
 else:
     src_lang = 'en'
@@ -171,6 +175,8 @@ else:
     train_data, src_vocab2num, trg_vocab2num, max_seq = stats_data(train_data, src_lang, trg_lang)
     dev_data = stats_data(dev_data, src_lang, trg_lang, False)
     test_data = stats_data(test_data, src_lang, trg_lang, False)
+    torch.save(dev_data['trg'], 'dev_raw_trg.pt')
+    torch.save(test_data['trg'], 'test_raw_trg.pt')
     print('Building dataset')
     train_src_data, train_trg_data = build_train_dev_dataset(train_data, src_vocab2num, trg_vocab2num, max_seq)
     dev_src_data, dev_trg_data = build_train_dev_dataset(dev_data, src_vocab2num, trg_vocab2num, max_seq)
@@ -190,3 +196,4 @@ print('Saving dataloader')
 torch.save(train_loader, 'train_loader.pt')
 torch.save(dev_loader, 'dev_loader.pt')
 torch.save(test_loader, 'test_loader.pt')
+torch.save(max_seq, 'max_seq.pt')

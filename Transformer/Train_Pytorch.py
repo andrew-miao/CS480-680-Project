@@ -83,6 +83,7 @@ if __name__ == '__main__':
     src_vocab2num = torch.load('src_vocab2num.pt')
     trg_vocab2num = torch.load('trg_vocab2num.pt')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    torch.cuda.empty_cache()
     # device = torch.device('cpu')
     model = TransformerModel(len(src_vocab2num), len(trg_vocab2num), 512, 1, 1, 1, d_ff=1024).to(device)
     path = 'best_adam_transformer.pt'
