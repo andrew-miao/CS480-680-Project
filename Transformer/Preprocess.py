@@ -15,6 +15,41 @@ def tokenize_de(text):
 def tokenize_en(text):
     return [tok.text for tok in spacy_en.tokenizer(text)]
 
+
+def buildTensor(dataset, max_seq, src_vocab2num, trg_vocab2num, train=True, dev=False, test=False):
+    src_data = torch.ones(len(dataset), max_seq + 2)
+    trg_data = None
+    if not train:
+        raw_trg = []
+    if not test:
+        trg_data = torch.ones(len(dataset), max_seq + 2)
+
+    for i, sentence in enumerate(dataset):
+        src_data[i][0] = src_vocab2num[BOS]
+        src_data[i][-1] = trg_vocab2num[EOS]
+        for j in range(1, min(max_seq + 1, len(sentence.src))):
+            word = sentence.src[j - 1]
+            src_data[i][j] = src_vocab2num[word]
+
+        if trg_data is not None:
+            trg_data[i][0] = trg_vocab2num[BOS]
+            trg_data[i][-1] = trg_vocab2num[EOS]
+            for j in range(1, min(max_seq + 1, len(sentence.trg))):
+                word = sentence.trg[j - 1]
+                trg_data[i][j] = trg_vocab2num[word]
+
+            if not train:
+                raw_trg.append(sentence.trg)
+
+    if trg_data is not None and train:
+        return src_data, trg_data
+
+    elif trg_data is not None and dev:
+        return src_data, trg_data, raw_trg
+
+    else:
+        return src_data, raw_trg
+
 np.random.seed(42)
 def readLangs(lang1, lang2, train_size=0.8, dev_size=0.1):
     print("Reading lines...")
@@ -94,59 +129,29 @@ iwslt = False
 batch_size = 200
 print('Loading dataset')
 if iwslt:
-    BOS_WORD = '<s>'
-    EOS_WORD = '</s>'
-    BLANK_WORD = "<pad>"
-    SRC = Field(tokenize=tokenize_en, pad_token=BLANK_WORD)
-    TGT = Field(tokenize=tokenize_de, init_token=BOS_WORD, eos_token = EOS_WORD, pad_token=BLANK_WORD)
-    max_seq = 20
-    train, dev, test = IWSLT.splits(exts=('.en', '.de'), fields=(SRC, TGT), filter_pred=lambda x: len(vars(x)['src']) <= max_seq and len(vars(x)['trg']) <= max_seq)
+    BOS = '<s>'
+    EOS = '</s>'
+    PAD = "<pad>"
+    SRC = Field(tokenize=tokenize_en, pad_token=PAD)
+    TGT = Field(tokenize=tokenize_de, init_token=BOS, eos_token = EOS, pad_token=PAD)
+    max_seq = 30
+    train_data, dev_data, test_data = IWSLT.splits(exts=('.en', '.de'), fields=(SRC, TGT), filter_pred=lambda x: len(vars(x)['src']) <= max_seq and len(vars(x)['trg']) <= max_seq)
 
     min_freq = 2
-    batch_size = 200
-    SRC.build_vocab(train.src, min_freq=min_freq)
-    TGT.build_vocab(train.trg, min_freq=min_freq)
+    batch_size = 100
+    SRC.build_vocab(train_data.src, min_freq=min_freq)
+    TGT.build_vocab(train_data.trg, min_freq=min_freq)
 
     src_vocab = SRC.vocab
     trg_vocab = TGT.vocab
-    src_train_data = torch.ones(len(train), max_seq)
-    trg_train_data = torch.ones(len(train), max_seq)
-    src_dev_data = torch.ones(len(dev), max_seq)
-    trg_dev_data = torch.ones(len(dev), max_seq)
-    src_test_data = torch.ones(len(test), max_seq)
-    raw_dev_trg = []
-    raw_test_trg = []
+    src_train_data, trg_train_data = buildTensor(train_data, max_seq, src_vocab.stoi,
+                                                 trg_vocab.stoi, train=True)
 
-    for i, sentence in enumerate(train):
-        for j, word in enumerate(sentence.src):
-            src_train_data[i][j] = src_vocab.stoi[word]
+    src_dev_data, trg_dev_data, raw_dev_trg = buildTensor(dev_data, max_seq, src_vocab.stoi,
+                                             trg_vocab.stoi, train=False, dev=True)
 
-        for j, word in enumerate(sentence.trg):
-            trg_train_data[i][j] = trg_vocab.stoi[word]
-
-    for i, sentence in enumerate(dev):
-        for j, word in enumerate(sentence.src):
-            if word in src_vocab.stoi:
-                src_dev_data[i][j] = src_vocab.stoi[word]
-            else:
-                src_dev_data[i][j] = 0
-
-        for j, word in enumerate(sentence.trg):
-            if word in trg_vocab.stoi:
-                trg_dev_data[i][j] = trg_vocab.stoi[word]
-            else:
-                trg_dev_data[i][j] = 0
-
-        raw_dev_trg.append((sentence.trg))
-
-    for i, sentence in enumerate(test):
-        for j, word in enumerate(sentence.src):
-            if word in src_vocab.stoi:
-                src_test_data[i][j] = src_vocab.stoi[word]
-            else:
-                src_test_data[i][j] = 0
-
-        raw_test_trg.append(sentence.trg)
+    src_test_data, raw_test_trg = buildTensor(test_data, max_seq, src_vocab.stoi,
+                                              trg_vocab.stoi, train=False, test=True)
 
     src_train_data, trg_train_data = src_train_data.type(torch.long), trg_train_data.type(torch.long)
     src_dev_data, trg_dev_data = src_dev_data.type(torch.long), trg_dev_data.type(torch.long)
@@ -161,12 +166,16 @@ if iwslt:
     train_loader = DataLoader(train, batch_size=batch_size, pin_memory=True)
     dev_loader = DataLoader(dev, batch_size=batch_size, pin_memory=True)
     test_loader = DataLoader(test, batch_size=batch_size, pin_memory=True)
+
+    print('Saving dataloader')
     torch.save(src_vocab.stoi, 'src_vocab2num.pt')
     torch.save(src_vocab.itos, 'src_num2vocab.pt')
     torch.save(trg_vocab.stoi, 'trg_vocab2num.pt')
     torch.save(trg_vocab.itos, 'trg_num2vocab.pt')
-    torch.save(raw_dev_trg, 'dev_raw_trg.pt')
-    torch.save(raw_test_trg, 'test_raw_trg.pt')
+    torch.save(raw_test_trg, 'raw_test_trg.pt')
+    torch.save(train_loader, 'train_loader.pt')
+    torch.save(dev_loader, 'dev_loader.pt')
+    torch.save(test_loader, 'test_loader.pt')
 
 else:
     src_lang = 'en'
