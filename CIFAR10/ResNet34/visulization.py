@@ -32,6 +32,7 @@ def plot_curves(names=['madam', 'adam', 'adabelief', 'adabound', 'sgd'],
     for i in range(len(curve_data)):
         label = labels[i]
         acc = (1 - np.array(curve_data[i])) * 100
+        print('%s acc: %2f%%' % (label, np.max(acc)))
         if label == 'MAdam':
             plt.plot(acc, '-', label=label)
         else:
