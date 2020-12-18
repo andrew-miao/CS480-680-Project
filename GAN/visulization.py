@@ -18,7 +18,7 @@ def get_data(names=['madam', 'adam', 'sgd'], lr='large'):
     return [torch.load(path) for path in paths]
 
 def plot_curves(names=['madam', 'adam', 'sgd'], 
-         lr='large', labels=None, ylim=(0, 10), loc='upper right'):
+         lr='large', labels=None, ylim=(0, 20), loc='upper right'):
 
     plt.figure()
     plt.ylim(ylim)
@@ -41,4 +41,4 @@ def plot_curves(names=['madam', 'adam', 'sgd'],
 
 if __name__ == '__main__':
     labels = ['MAdam', ' Adam', 'SGD']
-    plot_curves(labels=labels, lr='small')
+    plot_curves(labels=labels, lr='xlarge')
